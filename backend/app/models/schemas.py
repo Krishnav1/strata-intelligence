@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from enum import Enum
@@ -197,7 +197,7 @@ class OptimizationResponse(BaseResponse):
 class MonteCarloRequest(BaseModel):
     portfolio_id: str
     time_horizon: int  # in days
-    num_simulations: int = Field(default=1000, le=10000)
+    num_simulations: int = Field(default=1000, ge=1, le=10000)
     confidence_levels: List[float] = Field(default=[0.05, 0.25, 0.5, 0.75, 0.95])
 
 class MonteCarloResult(BaseModel):
@@ -219,6 +219,16 @@ class ScenarioCreate(BaseModel):
     shocks: Dict[str, float]
     is_preset: bool = False
 
+    @field_validator('shocks')
+    @classmethod
+    def validate_shocks(cls, v):
+        if not isinstance(v, dict):
+            raise ValueError('Shocks must be a dictionary')
+        for key, value in v.items():
+            if not isinstance(value, (int, float)):
+                raise ValueError(f'Shock value for {key} must be numeric')
+        return v
+
 class ScenarioResponse(BaseModel):
     id: str
     name: str
@@ -234,7 +244,7 @@ class ReportRequest(BaseModel):
     portfolio_id: str
     sections: List[str] = Field(default=["performance", "risk", "sensitivity", "optimization"])
     include_charts: bool = True
-    format: str = Field(default="pdf", regex="^(pdf|excel|both)$")
+    format: str = Field(default="pdf", pattern="^(pdf|excel|both)$")
 
 class ReportResponse(BaseResponse):
     run_id: str
@@ -260,13 +270,3 @@ class DataSuggestion(BaseModel):
     similarity_score: float
     data_info: Dict[str, Any]
     status: str = "pending"
-
-# Validation
-@validator('shocks', pre=True)
-def validate_shocks(cls, v):
-    if not isinstance(v, dict):
-        raise ValueError('Shocks must be a dictionary')
-    for key, value in v.items():
-        if not isinstance(value, (int, float)):
-            raise ValueError(f'Shock value for {key} must be numeric')
-    return v
