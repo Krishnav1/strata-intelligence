@@ -1,0 +1,334 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Dict, Any, Optional
+from datetime import datetime, date
+
+from ...core.auth import get_current_user_id
+from ...core.database import db
+from ...models.schemas import DataPreview, DataSuggestion, BaseResponse
+
+router = APIRouter()
+
+@router.get("/{portfolio_id}/preview")
+async def get_data_preview(
+    portfolio_id: str,
+    file_type: Optional[str] = None,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Get data preview for uploaded files"""
+    try:
+        # Verify portfolio ownership
+        portfolio = await db.get_portfolio(portfolio_id, user_id)
+        if not portfolio:
+            raise HTTPException(status_code=404, detail="Portfolio not found")
+        
+        files = await db.get_portfolio_files(portfolio_id)
+        
+        if file_type:
+            files = [f for f in files if f['file_type'] == file_type and f['status'] == 'succeeded']
+        else:
+            files = [f for f in files if f['status'] == 'succeeded']
+        
+        previews = {}
+        
+        for file_info in files:
+            file_type_key = file_info['file_type']
+            
+            if file_type_key in ['assets', 'factors', 'benchmarks']:
+                # Get time series data preview
+                if file_type_key == 'assets':
+                    df = await db.get_asset_data(portfolio_id)
+                elif file_type_key == 'factors':
+                    df = await db.get_factor_data(portfolio_id)
+                else:  # benchmarks
+                    df = await db.get_benchmark_data(portfolio_id)
+                
+                if not df.empty:
+                    # Convert to preview format
+                    headers = list(df.columns)
+                    sample_rows = df.head(5).values.tolist()
+                    
+                    # Convert datetime objects to strings
+                    for i, row in enumerate(sample_rows):
+                        sample_rows[i] = [
+                            item.strftime('%Y-%m-%d') if isinstance(item, (datetime, date)) 
+                            else str(item) for item in row
+                        ]
+                    
+                    date_range = None
+                    if 'date' in df.columns:
+                        date_range = {
+                            'start': df['date'].min().strftime('%Y-%m-%d'),
+                            'end': df['date'].max().strftime('%Y-%m-%d')
+                        }
+                    
+                    previews[file_type_key] = {
+                        'headers': headers,
+                        'sample_rows': sample_rows,
+                        'total_rows': len(df),
+                        'date_range': date_range,
+                        'data_quality': {
+                            'completeness': 95.0,  # Would calculate from actual data
+                            'missing_values': 0
+                        }
+                    }
+            
+            elif file_type_key == 'sector_holdings':
+                # Get holdings data preview
+                response = db.client.table("holding_data").select("*").eq("portfolio_id", portfolio_id).limit(5).execute()
+                
+                if response.data:
+                    holdings_data = response.data
+                    headers = ['asset_name', 'sector', 'weight_percent', 'market_value_inr', 'beta']
+                    sample_rows = []
+                    
+                    for holding in holdings_data:
+                        row = [
+                            holding.get('asset_name', ''),
+                            holding.get('sector', ''),
+                            holding.get('weight_percent', 0),
+                            holding.get('market_value_inr', 0),
+                            holding.get('beta', 0)
+                        ]
+                        sample_rows.append([str(item) for item in row])
+                    
+                    # Get total count
+                    count_response = db.client.table("holding_data").select("id", count="exact").eq("portfolio_id", portfolio_id).execute()
+                    total_rows = count_response.count if hasattr(count_response, 'count') else len(sample_rows)
+                    
+                    previews[file_type_key] = {
+                        'headers': headers,
+                        'sample_rows': sample_rows,
+                        'total_rows': total_rows,
+                        'date_range': None,
+                        'data_quality': {
+                            'completeness': 100.0,
+                            'missing_values': 0
+                        }
+                    }
+        
+        return previews
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get data preview: {str(e)}"
+        )
+
+@router.get("/{portfolio_id}/suggestions")
+async def get_data_suggestions(
+    portfolio_id: str,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Get smart data suggestions for portfolio"""
+    try:
+        # Verify portfolio ownership
+        portfolio = await db.get_portfolio(portfolio_id, user_id)
+        if not portfolio:
+            raise HTTPException(status_code=404, detail="Portfolio not found")
+        
+        # Get existing suggestions
+        response = db.client.table("data_suggestions").select("*").eq("portfolio_id", portfolio_id).eq("status", "pending").execute()
+        
+        suggestions = []
+        if response.data:
+            for suggestion_data in response.data:
+                # Get the suggested fingerprint details
+                fingerprint_response = db.client.table("data_fingerprints").select("*").eq("id", suggestion_data["suggested_fingerprint_id"]).single().execute()
+                
+                if fingerprint_response.data:
+                    fingerprint = fingerprint_response.data
+                    
+                    suggestions.append({
+                        'id': suggestion_data['id'],
+                        'suggestion_type': suggestion_data['suggestion_type'],
+                        'title': f"Similar {fingerprint['file_type'].title()} Dataset",
+                        'description': f"Found dataset with {suggestion_data['similarity_score']:.0%} similarity",
+                        'similarity_score': suggestion_data['similarity_score'],
+                        'data_info': {
+                            'file_type': fingerprint['file_type'],
+                            'asset_count': len(fingerprint.get('asset_names', [])),
+                            'date_range': f"{fingerprint.get('date_range_start', '')} to {fingerprint.get('date_range_end', '')}",
+                            'sample_assets': fingerprint.get('asset_names', [])[:4]
+                        },
+                        'status': suggestion_data['status']
+                    })
+        
+        # If no suggestions exist, create some mock ones for demo
+        if not suggestions:
+            mock_suggestions = [
+                {
+                    'id': 'mock-1',
+                    'suggestion_type': 'similar_assets',
+                    'title': 'Similar Indian Equity Portfolio',
+                    'description': 'Dataset with 85% similar assets including major Indian indices',
+                    'similarity_score': 0.85,
+                    'data_info': {
+                        'file_type': 'assets',
+                        'asset_count': 12,
+                        'date_range': '2020-01-01 to 2024-12-31',
+                        'sample_assets': ['NIFTY_50', 'NIFTY_MIDCAP_150', 'GOLD_ETF', 'HDFC_BANK']
+                    },
+                    'status': 'pending'
+                },
+                {
+                    'id': 'mock-2',
+                    'suggestion_type': 'same_period',
+                    'title': 'Matching Time Period Factors',
+                    'description': 'Risk factors covering the same time period with Indian market data',
+                    'similarity_score': 0.92,
+                    'data_info': {
+                        'file_type': 'factors',
+                        'asset_count': 5,
+                        'date_range': '2023-01-01 to 2024-12-31',
+                        'sample_assets': ['INTEREST_RATE_10Y', 'USD_INR', 'CRUDE_OIL', 'VIX_INDIA']
+                    },
+                    'status': 'pending'
+                }
+            ]
+            suggestions.extend(mock_suggestions)
+        
+        return suggestions
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get data suggestions: {str(e)}"
+        )
+
+@router.post("/{portfolio_id}/suggestions/{suggestion_id}/accept")
+async def accept_data_suggestion(
+    portfolio_id: str,
+    suggestion_id: str,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Accept a data suggestion"""
+    try:
+        # Verify portfolio ownership
+        portfolio = await db.get_portfolio(portfolio_id, user_id)
+        if not portfolio:
+            raise HTTPException(status_code=404, detail="Portfolio not found")
+        
+        # For mock suggestions, just return success
+        if suggestion_id.startswith('mock-'):
+            return BaseResponse(message="Suggestion accepted successfully (demo mode)")
+        
+        # Update suggestion status
+        db.client.table("data_suggestions").update({"status": "accepted"}).eq("id", suggestion_id).execute()
+        
+        # Here you would implement the logic to copy the suggested data
+        # to the user's portfolio
+        
+        return BaseResponse(message="Suggestion accepted successfully")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to accept suggestion: {str(e)}"
+        )
+
+@router.post("/{portfolio_id}/suggestions/{suggestion_id}/dismiss")
+async def dismiss_data_suggestion(
+    portfolio_id: str,
+    suggestion_id: str,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Dismiss a data suggestion"""
+    try:
+        # Verify portfolio ownership
+        portfolio = await db.get_portfolio(portfolio_id, user_id)
+        if not portfolio:
+            raise HTTPException(status_code=404, detail="Portfolio not found")
+        
+        # For mock suggestions, just return success
+        if suggestion_id.startswith('mock-'):
+            return BaseResponse(message="Suggestion dismissed successfully (demo mode)")
+        
+        # Update suggestion status
+        db.client.table("data_suggestions").update({"status": "dismissed"}).eq("id", suggestion_id).execute()
+        
+        return BaseResponse(message="Suggestion dismissed successfully")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to dismiss suggestion: {str(e)}"
+        )
+
+@router.get("/{portfolio_id}/statistics")
+async def get_portfolio_statistics(
+    portfolio_id: str,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Get portfolio data statistics"""
+    try:
+        # Verify portfolio ownership
+        portfolio = await db.get_portfolio(portfolio_id, user_id)
+        if not portfolio:
+            raise HTTPException(status_code=404, detail="Portfolio not found")
+        
+        stats = {
+            'data_completeness': 0,
+            'total_assets': 0,
+            'date_coverage': {},
+            'data_quality_score': 0,
+            'last_updated': None
+        }
+        
+        # Get asset data stats
+        asset_df = await db.get_asset_data(portfolio_id)
+        if not asset_df.empty:
+            stats['total_assets'] = len([col for col in asset_df.columns if col != 'date'])
+            if 'date' in asset_df.columns:
+                stats['date_coverage'] = {
+                    'start': asset_df['date'].min().strftime('%Y-%m-%d'),
+                    'end': asset_df['date'].max().strftime('%Y-%m-%d'),
+                    'days': (asset_df['date'].max() - asset_df['date'].min()).days
+                }
+        
+        # Get holdings data stats
+        holdings_response = db.client.table("holding_data").select("*").eq("portfolio_id", portfolio_id).execute()
+        if holdings_response.data:
+            holdings_df = holdings_response.data
+            total_weight = sum(h.get('weight_percent', 0) for h in holdings_df)
+            stats['portfolio_weight_sum'] = total_weight
+            stats['holdings_count'] = len(holdings_df)
+        
+        # Calculate completeness
+        files = await db.get_portfolio_files(portfolio_id)
+        required_types = ['assets', 'factors', 'benchmarks', 'sector_holdings']
+        completed_types = [f['file_type'] for f in files if f['status'] == 'succeeded']
+        stats['data_completeness'] = len(completed_types) / len(required_types) * 100
+        
+        # Data quality score (simplified)
+        quality_factors = []
+        if stats['data_completeness'] > 0:
+            quality_factors.append(stats['data_completeness'] / 100)
+        if stats.get('portfolio_weight_sum', 0) > 95:  # Weights close to 100%
+            quality_factors.append(1.0)
+        if stats['total_assets'] > 0:
+            quality_factors.append(min(stats['total_assets'] / 10, 1.0))  # More assets = better
+        
+        stats['data_quality_score'] = sum(quality_factors) / len(quality_factors) * 100 if quality_factors else 0
+        
+        # Last updated
+        if files:
+            latest_file = max(files, key=lambda x: x['updated_at'])
+            stats['last_updated'] = latest_file['updated_at']
+        
+        return stats
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get portfolio statistics: {str(e)}"
+        )

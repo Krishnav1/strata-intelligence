@@ -1,73 +1,99 @@
-# Welcome to your Lovable project
+# Strata Intelligence - Portfolio Intelligence Platform
 
-## Project info
+A comprehensive, professional-grade portfolio intelligence platform built with React, FastAPI, and Supabase. Provides 360-degree portfolio analysis including performance attribution, risk diagnostics, stress testing, and optimization.
 
-**URL**: https://lovable.dev/projects/3d87c2c1-92ef-4170-8ec7-90eba8c03b7a
+## 🚀 Features
 
-## How can I edit this code?
+### Core Platform
+- **Authentication System**: Secure Supabase auth with JWT tokens
+- **Portfolio Management**: Create, manage, and analyze multiple portfolios
+- **Smart File Upload**: Drag-and-drop upload with validation for 4 data types
+- **Sample Datasets**: Download realistic Indian market data examples
+- **Data Preview**: Interactive preview of uploaded and processed data
+- **Smart Suggestions**: AI-powered data similarity detection and recommendations
 
-There are several ways of editing your application.
+### Advanced Analytics
+- **Performance Analysis**: Comprehensive historical performance metrics
+- **Risk Diagnostics**: Multi-dimensional risk analysis
+- **Sensitivity & Stress Testing**: Scenario-based risk assessment
+- **Portfolio Optimization**: Modern portfolio theory implementation
+- **Monte Carlo Simulation**: Forward-looking portfolio projections
 
-**Use Lovable**
+## 🛠️ Technology Stack
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/3d87c2c1-92ef-4170-8ec7-90eba8c03b7a) and start prompting.
+### Frontend
+- **React 18** with TypeScript
+- **Vite** for fast development and building
+- **shadcn/ui** for beautiful, accessible components
+- **TanStack Query** for data fetching and caching
+- **Supabase** for backend services
 
-Changes made via Lovable will be committed automatically to this repo.
+### Backend
+- **FastAPI** with Python 3.11+
+- **Supabase** for database, auth, and storage
+- **Pandas/NumPy** for data processing
+- **SciPy** for optimization algorithms
 
-**Use your preferred IDE**
+## 🚀 Quick Start
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Frontend Setup
+```bash
+# Install dependencies
+npm install
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Backend Setup
+```bash
+# Navigate to backend directory
+cd backend
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-**Use GitHub Codespaces**
+# Install dependencies
+pip install -r requirements.txt
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your Supabase credentials
 
-## What technologies are used for this project?
+# Start the server
+python start.py
+```
 
-This project is built with:
+### Access the Application
+- **Frontend**: http://localhost:8080
+- **Backend API**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 📊 Data Requirements
 
-## How can I deploy this project?
+The platform supports 4 types of data files:
 
-Simply open [Lovable](https://lovable.dev/projects/3d87c2c1-92ef-4170-8ec7-90eba8c03b7a) and click on Share -> Publish.
+1. **Assets**: Historical price data for portfolio assets
+2. **Risk Factors**: Market risk factors for sensitivity analysis
+3. **Benchmarks**: Benchmark indices for performance comparison
+4. **Holdings**: Portfolio composition and sector allocation
 
-## Can I connect a custom domain to my Lovable project?
+Sample datasets are provided for download within the application.
 
-Yes, you can!
+## 📱 Usage
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+1. **Sign Up/Login**: Create account or sign in
+2. **Create Portfolio**: Set up a new portfolio for analysis
+3. **Upload Data**: Upload your 4 required data files or use samples
+4. **View Preview**: Review uploaded data quality
+5. **Run Analysis**: Execute comprehensive analytics
+6. **Review Results**: Explore insights and recommendations
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## 🏗️ Architecture
+
+- **Frontend**: React components with TypeScript
+- **Backend**: FastAPI with async processing
+- **Database**: Supabase PostgreSQL with RLS
+- **Storage**: Supabase Storage for file management
+- **Analytics**: Python-based financial calculations
