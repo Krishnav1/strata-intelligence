@@ -8,7 +8,30 @@ from typing import Optional, Dict, Any
 from .config import settings
 
 security = HTTPBearer()
-supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+
+# Lazy initialization of Supabase client
+_supabase_client: Optional[Client] = None
+
+def get_supabase_client() -> Client:
+    """Get or create Supabase client with proper error handling"""
+    global _supabase_client
+    
+    if _supabase_client is None:
+        if not settings.SUPABASE_SERVICE_ROLE_KEY:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="SUPABASE_SERVICE_ROLE_KEY environment variable is not set"
+            )
+        
+        try:
+            _supabase_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to initialize Supabase client: {str(e)}"
+            )
+    
+    return _supabase_client
 
 class AuthenticationError(HTTPException):
     def __init__(self, detail: str = "Could not validate credentials"):
@@ -25,7 +48,8 @@ async def verify_supabase_token(credentials: HTTPAuthorizationCredentials = Depe
     token = credentials.credentials
     
     try:
-        # Verify token with Supabase
+        # Get Supabase client and verify token
+        supabase = get_supabase_client()
         response = supabase.auth.get_user(token)
         
         if not response.user:
@@ -63,7 +87,13 @@ class SupabaseAuth:
     """
     
     def __init__(self):
-        self.client = supabase
+        # Use lazy initialization
+        pass
+    
+    @property
+    def client(self) -> Client:
+        """Get Supabase client"""
+        return get_supabase_client()
     
     async def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
