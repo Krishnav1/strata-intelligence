@@ -2,39 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Professional Fintech Design System - Dark Theme Portfolio Dashboard */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Core Dark Theme Colors */
+    --background: 218 23% 11%; /* Deep navy #1A202C */
+    --foreground: 210 20% 96%; /* Light gray text */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Card System */
+    --card: 218 20% 14%; /* Slightly lighter than background */
+    --card-foreground: 210 20% 96%;
+    --card-border: 217 19% 20%; /* Subtle border */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    /* Interactive Elements */
+    --popover: 218 20% 16%;
+    --popover-foreground: 210 20% 96%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Fintech Primary - Professional Teal */
+    --primary: 180 100% 33%; /* #00A8A8 */
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 180 100% 28%;
+    --primary-glow: 180 100% 50%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary - Electric Blue */
+    --secondary: 211 100% 58%; /* #4A90E2 */
+    --secondary-foreground: 0 0% 100%;
+    --secondary-hover: 211 100% 48%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Semantic Colors */
+    --success: 145 63% 49%; /* #2ECC71 - Gains */
+    --success-foreground: 0 0% 100%;
+    --success-muted: 145 63% 25%;
+    
+    --danger: 4 90% 58%; /* #E74C3C - Losses */
+    --danger-foreground: 0 0% 100%;
+    --danger-muted: 4 90% 35%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Neutral System */
+    --muted: 217 19% 18%;
+    --muted-foreground: 215 15% 65%;
+    --accent: 217 19% 22%;
+    --accent-foreground: 210 20% 96%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Interactive States */
+    --border: 217 19% 25%;
+    --input: 217 19% 18%;
+    --ring: 180 100% 33%;
+    
+    /* Chart Colors */
+    --chart-primary: 180 100% 33%;
+    --chart-secondary: 211 100% 58%;
+    --chart-tertiary: 260 100% 60%;
+    --chart-quaternary: 32 100% 60%;
+    --chart-background: 218 20% 16%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(180 100% 33%), hsl(180 100% 50%));
+    --gradient-success: linear-gradient(135deg, hsl(145 63% 49%), hsl(145 63% 60%));
+    --gradient-danger: linear-gradient(135deg, hsl(4 90% 58%), hsl(4 90% 68%));
+    --gradient-card: linear-gradient(135deg, hsl(218 20% 14%), hsl(218 20% 16%));
+
+    /* Shadows */
+    --shadow-card: 0 4px 20px hsl(218 23% 8% / 0.6);
+    --shadow-primary: 0 0 20px hsl(180 100% 33% / 0.3);
+    --shadow-interactive: 0 8px 32px hsl(218 23% 8% / 0.8);
 
     --radius: 0.5rem;
 
@@ -101,5 +135,74 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer components {
+  /* KPI Card Styles */
+  .kpi-card {
+    @apply bg-gradient-to-br from-card to-accent border border-card-border rounded-lg p-6 shadow-[var(--shadow-card)] transition-all duration-300 hover:shadow-[var(--shadow-interactive)];
+  }
+
+  .kpi-value {
+    @apply text-3xl font-bold tracking-tight;
+  }
+
+  .kpi-label {
+    @apply text-sm font-medium text-muted-foreground uppercase tracking-wide;
+  }
+
+  /* Chart Container */
+  .chart-container {
+    @apply bg-chart-background rounded-lg border border-card-border p-6 shadow-[var(--shadow-card)];
+  }
+
+  /* Interactive Elements */
+  .fintech-button {
+    @apply bg-gradient-to-r from-primary to-primary-glow hover:from-primary-hover hover:to-primary text-primary-foreground font-semibold px-6 py-3 rounded-lg shadow-[var(--shadow-primary)] transition-all duration-300 hover:scale-105;
+  }
+
+  .secondary-button {
+    @apply bg-secondary hover:bg-secondary-hover text-secondary-foreground font-medium px-4 py-2 rounded-lg transition-colors duration-200;
+  }
+
+  /* Success/Danger Indicators */
+  .success-text {
+    @apply text-success font-semibold;
+  }
+
+  .danger-text {
+    @apply text-danger font-semibold;
+  }
+
+  .success-badge {
+    @apply bg-success-muted text-success-foreground px-2 py-1 rounded-md text-sm font-medium;
+  }
+
+  .danger-badge {
+    @apply bg-danger-muted text-danger-foreground px-2 py-1 rounded-md text-sm font-medium;
+  }
+
+  /* Navigation Tabs */
+  .nav-tab {
+    @apply px-6 py-3 font-medium transition-all duration-200 border-b-2 border-transparent hover:border-primary/50;
+  }
+
+  .nav-tab.active {
+    @apply border-primary text-primary;
+  }
+
+  /* Data Tables */
+  .data-table {
+    @apply bg-card border border-card-border rounded-lg overflow-hidden shadow-[var(--shadow-card)];
+  }
+
+  .table-header {
+    @apply bg-accent text-accent-foreground font-semibold text-sm uppercase tracking-wide;
+  }
+
+  .table-row {
+    @apply border-b border-border hover:bg-muted/50 transition-colors duration-150;
   }
 }
