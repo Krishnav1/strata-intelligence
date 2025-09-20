@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 
 const API_BASE = 'https://strata-intelligence.onrender.com/api/v1/simple';
 
@@ -18,31 +17,45 @@ interface AnalysisSession {
 }
 
 export const useSimpleAnalysis = () => {
-  const queryClient = useQueryClient();
+  const [session, setSession] = useState<AnalysisSession | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
-  // Get current session with polling to keep it updated
-  const { data: session, isLoading, error, refetch: refetchSession } = useQuery({
-    queryKey: ['simple-analysis-session'],
-    queryFn: async () => {
+  // Manual session fetching function
+  const fetchSession = async () => {
+    try {
       const response = await fetch(`${API_BASE}/session`);
       if (!response.ok) {
         throw new Error('Failed to fetch session');
       }
-      return response.json();
-    },
-    refetchInterval: 2000, // Poll every 2 seconds to keep session updated
-    refetchIntervalInBackground: false,
-  });
+      const data = await response.json();
+      setSession(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  // Upload file mutation
-  const uploadFileMutation = useMutation({
-    mutationFn: async ({ 
-      file, 
-      fileType 
-    }: { 
-      file: File; 
-      fileType: 'assets' | 'factors' | 'benchmarks' | 'sector_holdings';
-    }) => {
+  // Initial fetch and polling
+  useEffect(() => {
+    fetchSession();
+    const interval = setInterval(fetchSession, 3000); // Poll every 3 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  // Upload file function
+  const uploadFile = async ({ 
+    file, 
+    fileType 
+  }: { 
+    file: File; 
+    fileType: 'assets' | 'factors' | 'benchmarks' | 'sector_holdings';
+  }) => {
+    try {
+      setIsUploading(true);
       const formData = new FormData();
       formData.append('file', file);
       formData.append('file_type', fileType);
@@ -57,17 +70,25 @@ export const useSimpleAnalysis = () => {
         throw new Error(error || 'Upload failed');
       }
 
-      return response.json();
-    },
-    onSuccess: () => {
-      // Don't invalidate queries to prevent circular dependency errors
-      // The session will be refetched naturally on next render
-    },
-  });
+      const result = await response.json();
+      
+      // Refresh session after successful upload
+      setTimeout(() => {
+        fetchSession();
+      }, 1000);
+      
+      return result;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+      throw err;
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
-  // Reset session mutation
-  const resetSessionMutation = useMutation({
-    mutationFn: async () => {
+  // Reset session function
+  const resetSession = async () => {
+    try {
       const response = await fetch(`${API_BASE}/reset`, {
         method: 'POST',
       });
@@ -76,39 +97,36 @@ export const useSimpleAnalysis = () => {
         throw new Error('Failed to reset session');
       }
 
-      return response.json();
-    },
-    onSuccess: () => {
-      // Don't invalidate queries to prevent circular dependency errors
-    },
-  });
+      const result = await response.json();
+      
+      // Refresh session after reset
+      setTimeout(() => {
+        fetchSession();
+      }, 500);
+      
+      return result;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Reset failed');
+      throw err;
+    }
+  };
 
-  // Get analysis results - simplified to avoid circular dependencies
-  const {
-    data: analysisResults,
-    isLoading: isAnalysisLoading,
-  } = useQuery({
-    queryKey: ['analysis-results'],
-    queryFn: async () => {
-      try {
-        const response = await fetch(`${API_BASE}/analysis`);
-        if (!response.ok) {
-          if (response.status === 404) {
-            return null; // No results yet
-          }
-          throw new Error('Failed to fetch analysis results');
+  // Manual function to fetch analysis results
+  const fetchAnalysisResults = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/analysis`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null; // No results yet
         }
-        return response.json();
-      } catch (error) {
-        console.log('Analysis fetch error:', error);
-        return null;
+        throw new Error('Failed to fetch analysis results');
       }
-    },
-    enabled: false, // Disable automatic fetching to prevent loops
-    retry: false,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-  });
+      return await response.json();
+    } catch (error) {
+      console.log('Analysis fetch error:', error);
+      return null;
+    }
+  };
 
   const getFilesByType = (fileType: string) => {
     if (!session?.files) return [];
@@ -134,21 +152,6 @@ export const useSimpleAnalysis = () => {
     session?.analysis_results?.status === 'completed'
   );
 
-  // Manual function to fetch analysis results
-  const fetchAnalysisResults = async () => {
-    if (hasAnalysisResults) {
-      try {
-        const response = await fetch(`${API_BASE}/analysis`);
-        if (response.ok) {
-          return await response.json();
-        }
-      } catch (error) {
-        console.log('Error fetching analysis:', error);
-      }
-    }
-    return null;
-  };
-
   return {
     // Session data
     session,
@@ -157,10 +160,10 @@ export const useSimpleAnalysis = () => {
     error,
     
     // File operations
-    uploadFile: uploadFileMutation.mutate,
-    isUploading: uploadFileMutation.isPending,
-    resetSession: resetSessionMutation.mutate,
-    refetchSession, // Manual refresh function
+    uploadFile,
+    isUploading,
+    resetSession,
+    refetchSession: fetchSession, // Manual refresh function
     
     // Analysis results
     analysisResults: session?.analysis_results || null,

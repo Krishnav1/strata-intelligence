@@ -45,18 +45,18 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
-      acceptedFiles.forEach((file) => {
-        uploadFile({
-          file,
-          fileType: selectedFileType as 'assets' | 'factors' | 'benchmarks' | 'sector_holdings',
-        });
+      acceptedFiles.forEach(async (file) => {
+        try {
+          await uploadFile({
+            file,
+            fileType: selectedFileType as 'assets' | 'factors' | 'benchmarks' | 'sector_holdings',
+          });
+        } catch (error) {
+          console.error('Upload failed:', error);
+        }
       });
-      // Manually refresh session after upload (polling will handle the rest)
-      setTimeout(() => {
-        refetchSession();
-      }, 2000);
     },
-    [uploadFile, selectedFileType, refetchSession]
+    [uploadFile, selectedFileType]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
