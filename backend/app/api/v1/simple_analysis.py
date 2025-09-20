@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form, BackgroundTasks
 from typing import List, Dict, Any, Optional
 import aiofiles
 import os
@@ -21,12 +21,21 @@ CURRENT_SESSION = {
 
 @router.post("/upload")
 async def upload_analysis_file(
-    file_type: FileType,
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    file_type: str = Form(...)
 ):
     """Upload a file for analysis (no portfolio needed)"""
     try:
+        # Validate file_type
+        try:
+            file_type_enum = FileType(file_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid file_type. Must be one of: {', '.join([ft.value for ft in FileType])}"
+            )
+        
         # Initialize session if needed
         if not CURRENT_SESSION["session_id"]:
             CURRENT_SESSION["session_id"] = str(uuid.uuid4())
@@ -44,7 +53,7 @@ async def upload_analysis_file(
         file_data = {
             "id": file_id,
             "session_id": session_id,
-            "file_type": file_type.value,
+            "file_type": file_type_enum.value,
             "original_filename": file.filename,
             "file_size": file.size if hasattr(file, 'size') else None,
             "status": "queued",
@@ -52,12 +61,12 @@ async def upload_analysis_file(
         }
         
         # Store in session
-        CURRENT_SESSION["files"][file_type.value] = file_data
+        CURRENT_SESSION["files"][file_type_enum.value] = file_data
         
         # Save file temporarily
         temp_dir = f"temp/analysis/{session_id}"
         os.makedirs(temp_dir, exist_ok=True)
-        temp_file_path = os.path.join(temp_dir, f"{file_type.value}_{file.filename}")
+        temp_file_path = os.path.join(temp_dir, f"{file_type_enum.value}_{file.filename}")
         
         async with aiofiles.open(temp_file_path, 'wb') as f:
             content = await file.read()
@@ -69,7 +78,7 @@ async def upload_analysis_file(
             session_id,
             file_id,
             temp_file_path,
-            file_type.value
+            file_type_enum.value
         )
         
         return {
@@ -77,7 +86,7 @@ async def upload_analysis_file(
             "message": "File uploaded successfully",
             "session_id": session_id,
             "file_id": file_id,
-            "file_type": file_type.value,
+            "file_type": file_type_enum.value,
             "status": "queued"
         }
         
