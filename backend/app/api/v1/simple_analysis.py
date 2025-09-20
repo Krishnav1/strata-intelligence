@@ -99,16 +99,30 @@ async def upload_analysis_file(
 async def process_analysis_file_task(session_id: str, file_id: str, file_path: str, file_type: str):
     """Background task to process uploaded file"""
     try:
+        print(f"Processing file: {file_type} at {file_path}")
+        
         # Update status
         if file_type in CURRENT_SESSION["files"]:
             CURRENT_SESSION["files"][file_type]["status"] = "processing"
+            print(f"Updated status to processing for {file_type}")
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            raise Exception(f"File not found at {file_path}")
         
         # Read and process file
-        async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
-            file_content = await f.read()
+        try:
+            async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+                file_content = await f.read()
+            print(f"Successfully read file content: {len(file_content)} characters")
+        except Exception as e:
+            # Try reading as binary if UTF-8 fails
+            async with aiofiles.open(file_path, 'rb') as f:
+                file_content = await f.read()
+            file_content = str(file_content[:1000])  # Convert to string for storage
+            print(f"Read file as binary: {len(file_content)} characters")
         
         # Process the file (simplified - just store the data)
-        # In a real implementation, you'd parse CSV/Excel and validate
         processed_data = {
             "raw_content": file_content[:1000],  # First 1000 chars for preview
             "file_type": file_type,
@@ -118,16 +132,20 @@ async def process_analysis_file_task(session_id: str, file_id: str, file_path: s
         # Store processed data
         CURRENT_SESSION["files"][file_type]["processed_data"] = processed_data
         CURRENT_SESSION["files"][file_type]["status"] = "completed"
+        print(f"File {file_type} processing completed successfully")
         
         # Clean up temp file
         if os.path.exists(file_path):
             os.remove(file_path)
+            print(f"Cleaned up temp file: {file_path}")
             
         # Check if we have enough data to run analysis
+        print(f"Checking if analysis can be run...")
         await check_and_run_analysis(session_id)
+        print(f"Analysis check completed")
             
     except Exception as e:
-        print(f"File processing error: {e}")
+        print(f"File processing error for {file_type}: {e}")
         if file_type in CURRENT_SESSION["files"]:
             CURRENT_SESSION["files"][file_type]["status"] = "failed"
             CURRENT_SESSION["files"][file_type]["error"] = str(e)
@@ -136,9 +154,12 @@ async def check_and_run_analysis(session_id: str):
     """Check if we have minimum required files and run analysis"""
     try:
         files = CURRENT_SESSION["files"]
+        print(f"Checking analysis requirements. Files: {list(files.keys())}")
         
         # Check if we have at least assets data (minimum requirement)
         if "assets" in files and files["assets"]["status"] == "completed":
+            print("Assets file found and completed. Running analysis...")
+            
             # Run basic analysis
             analysis_result = {
                 "performance_metrics": {
@@ -157,6 +178,9 @@ async def check_and_run_analysis(session_id: str):
             }
             
             CURRENT_SESSION["analysis_results"] = analysis_result
+            print("Analysis completed successfully!")
+        else:
+            print(f"Analysis requirements not met. Assets status: {files.get('assets', {}).get('status', 'not found')}")
             
     except Exception as e:
         print(f"Analysis error: {e}")
@@ -184,10 +208,22 @@ async def get_uploaded_files():
 @router.get("/analysis")
 async def get_analysis_results():
     """Get analysis results for current session"""
-    if not CURRENT_SESSION["analysis_results"]:
+    # Check if we have any files
+    if not CURRENT_SESSION["files"]:
         raise HTTPException(
             status_code=404, 
-            detail="No analysis results available. Please upload at least assets data."
+            detail="No files uploaded yet. Please upload at least assets data."
+        )
+    
+    # Check if we have analysis results
+    if not CURRENT_SESSION["analysis_results"]:
+        # Check file statuses to provide better error message
+        files = CURRENT_SESSION["files"]
+        file_statuses = {k: v["status"] for k, v in files.items()}
+        
+        raise HTTPException(
+            status_code=404, 
+            detail=f"No analysis results available yet. File statuses: {file_statuses}. Please wait for processing to complete."
         )
     
     return CURRENT_SESSION["analysis_results"]
@@ -219,3 +255,27 @@ async def get_analysis_status():
     }
     
     return status_summary
+
+@router.get("/debug")
+async def debug_session():
+    """Debug endpoint to see full session state"""
+    return {
+        "session_id": CURRENT_SESSION["session_id"],
+        "files": CURRENT_SESSION["files"],
+        "analysis_results": CURRENT_SESSION["analysis_results"],
+        "timestamp": datetime.now().isoformat()
+    }
+
+@router.post("/trigger-analysis")
+async def trigger_analysis():
+    """Manually trigger analysis for testing"""
+    if not CURRENT_SESSION["session_id"]:
+        raise HTTPException(status_code=400, detail="No active session")
+    
+    await check_and_run_analysis(CURRENT_SESSION["session_id"])
+    
+    return {
+        "success": True,
+        "message": "Analysis triggered",
+        "analysis_results": CURRENT_SESSION["analysis_results"]
+    }

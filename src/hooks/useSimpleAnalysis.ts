@@ -101,7 +101,8 @@ export const useSimpleAnalysis = () => {
       }
       return response.json();
     },
-    enabled: !!session?.analysis_results,
+    enabled: !!session?.analysis_results && session.analysis_results.status === 'completed',
+    retry: false, // Don't retry on 404
   });
 
   const getFilesByType = (fileType: string) => {
