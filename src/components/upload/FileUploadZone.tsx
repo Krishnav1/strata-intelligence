@@ -1,6 +1,6 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { useFileUpload } from '@/hooks/useFileUpload';
+import { useSimpleAnalysis } from '@/hooks/useSimpleAnalysis';
 import { SampleDatasetCard } from './SampleDatasetCard';
 import { DataPreview } from './DataPreview';
 import { DataSuggestions } from './DataSuggestions';
@@ -23,16 +23,22 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   onAllFilesUploaded,
 }) => {
   const {
+    session,
     files,
     uploadFile,
-    deleteFile,
     isUploading,
-    isDeleting,
-    uploadProgress,
     getFilesByType,
     getRequiredFileTypes,
     isAllFilesUploaded,
-  } = useFileUpload(portfolioId);
+    hasAnalysisResults,
+  } = useSimpleAnalysis();
+
+  // Call onAllFilesUploaded when analysis is ready
+  useEffect(() => {
+    if (hasAnalysisResults && onAllFilesUploaded) {
+      onAllFilesUploaded();
+    }
+  }, [hasAnalysisResults, onAllFilesUploaded]);
 
   const [selectedFileType, setSelectedFileType] = useState<string>('assets');
 

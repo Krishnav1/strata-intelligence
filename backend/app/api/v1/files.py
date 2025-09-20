@@ -135,10 +135,7 @@ async def get_file_status(file_id: str):
         )
 
 @router.delete("/{file_id}", response_model=BaseResponse)
-async def delete_file(
-    file_id: str,
-    user_id: str = Depends(get_current_user_id)
-):
+async def delete_file(file_id: str):
     """Delete a file"""
     try:
         # Get file info

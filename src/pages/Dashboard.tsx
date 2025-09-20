@@ -7,39 +7,65 @@ import { AutomatedInsights } from '@/components/dashboard/AutomatedInsights';
 import { RiskDiagnostics } from '@/components/dashboard/RiskDiagnostics';
 import { SensitivityTesting } from '@/components/dashboard/SensitivityTesting';
 import { OptimizerBacktesting } from '@/components/dashboard/OptimizerBacktesting';
+import { useSimpleAnalysis } from '@/hooks/useSimpleAnalysis';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2 } from 'lucide-react';
 import { BarChart3, Target, TrendingUp, Shield } from 'lucide-react';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
+  const { analysisResults, isAnalysisLoading, hasAnalysisResults } = useSimpleAnalysis();
 
-  // Mock data for KPI cards
+  if (isAnalysisLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading analysis results...</span>
+      </div>
+    );
+  }
+
+  if (!hasAnalysisResults) {
+    return (
+      <Alert>
+        <AlertDescription>
+          No analysis results available yet. Please upload your data files first.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  // Use analysis results if available, otherwise show mock data
+  const performanceMetrics = analysisResults?.performance_metrics || {};
+  const riskMetrics = analysisResults?.risk_metrics || {};
+  
   const kpiData = [
     {
-      title: 'Portfolio Value',
-      value: '₹1,54,82,000',
-      trend: 2.34,
-      subtitle: 'vs last month',
-      sparklineData: [100, 102, 98, 105, 108, 112, 115, 118]
-    },
-    {
       title: 'Total Return',
-      value: '18.2%',
+      value: performanceMetrics.total_return ? `${(performanceMetrics.total_return * 100).toFixed(1)}%` : '15.0%',
       trend: 1.8,
-      subtitle: 'YTD performance',
+      subtitle: 'Portfolio performance',
       sparklineData: [100, 103, 101, 107, 110, 115, 118, 122]
     },
     {
-      title: 'Portfolio CAGR',
-      value: '14.6%',
+      title: 'Volatility',
+      value: performanceMetrics.volatility ? `${(performanceMetrics.volatility * 100).toFixed(1)}%` : '12.0%',
       trend: 0.5,
-      subtitle: '3-year average',
+      subtitle: 'Risk measure',
       sparklineData: [100, 105, 108, 112, 115, 118, 120, 125]
     },
     {
-      title: 'Daily VaR (95%)',
-      value: '₹2,85,000',
+      title: 'Sharpe Ratio',
+      value: performanceMetrics.sharpe_ratio ? performanceMetrics.sharpe_ratio.toFixed(2) : '1.25',
+      trend: 2.1,
+      subtitle: 'Risk-adjusted return',
+      sparklineData: [100, 102, 98, 105, 108, 112, 115, 118]
+    },
+    {
+      title: 'Max Drawdown',
+      value: performanceMetrics.max_drawdown ? `${(performanceMetrics.max_drawdown * 100).toFixed(1)}%` : '-8.0%',
       trend: -0.3,
-      subtitle: 'Risk exposure',
+      subtitle: 'Worst decline',
       sparklineData: [100, 98, 95, 97, 94, 92, 90, 88]
     }
   ];

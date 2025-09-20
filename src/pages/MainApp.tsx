@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { FileUploadZone } from '@/components/upload/FileUploadZone';
+import { useSimpleAnalysis } from '@/hooks/useSimpleAnalysis';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, CheckCircle, Upload, BarChart3 } from 'lucide-react';
@@ -10,7 +11,7 @@ type AppStep = 'upload' | 'dashboard';
 
 const MainApp: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<AppStep>('upload');
-  const [filesUploaded, setFilesUploaded] = useState(false);
+  const { hasAnalysisResults } = useSimpleAnalysis();
 
   const steps = [
     {
@@ -18,7 +19,7 @@ const MainApp: React.FC = () => {
       title: 'Upload Data',
       description: 'Upload your portfolio data files',
       icon: Upload,
-      completed: filesUploaded,
+      completed: hasAnalysisResults,
     },
     {
       id: 'dashboard',
@@ -30,7 +31,6 @@ const MainApp: React.FC = () => {
   ];
 
   const handleFilesUploaded = () => {
-    setFilesUploaded(true);
     setCurrentStep('dashboard');
   };
 
@@ -39,11 +39,11 @@ const MainApp: React.FC = () => {
   };
 
   const canProceedToNext = () => {
-    return currentStep === 'upload' && filesUploaded;
+    return currentStep === 'upload' && hasAnalysisResults;
   };
 
   const handleNext = () => {
-    if (currentStep === 'upload' && filesUploaded) {
+    if (currentStep === 'upload' && hasAnalysisResults) {
       setCurrentStep('dashboard');
     }
   };
