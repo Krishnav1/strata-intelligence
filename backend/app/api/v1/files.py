@@ -119,10 +119,7 @@ async def get_file_status(file_id: str):
         
         file_info = response.data
         
-        # Verify user owns the portfolio
-        portfolio = await db.get_portfolio(file_info["portfolio_id"], user_id)
-        if not portfolio:
-            raise HTTPException(status_code=403, detail="Access denied")
+        # Skip portfolio ownership check for demo mode
         
         return FileStatusResponse(**file_info)
         
@@ -146,10 +143,7 @@ async def delete_file(file_id: str):
         
         file_info = response.data
         
-        # Verify user owns the portfolio
-        portfolio = await db.get_portfolio(file_info["portfolio_id"], user_id)
-        if not portfolio:
-            raise HTTPException(status_code=403, detail="Access denied")
+        # Skip portfolio ownership check for demo mode
         
         # Delete from storage if exists
         storage_path = file_info.get("storage_path")
@@ -228,15 +222,11 @@ async def reprocess_file(
 
 @router.get("/{portfolio_id}/validation-summary")
 async def get_validation_summary(
-    portfolio_id: str,
-    user_id: str = Depends(get_current_user_id)
+    portfolio_id: str
 ):
     """Get data validation summary for portfolio"""
     try:
-        # Verify portfolio ownership
-        portfolio = await db.get_portfolio(portfolio_id, user_id)
-        if not portfolio:
-            raise HTTPException(status_code=404, detail="Portfolio not found")
+        # Skip portfolio ownership check for demo mode
         
         files = await db.get_portfolio_files(portfolio_id)
         

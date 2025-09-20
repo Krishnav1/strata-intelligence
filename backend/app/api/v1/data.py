@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Dict, Any, Optional
 from datetime import datetime, date
 
-from ...core.auth import get_current_user_id
+# Removed auth import for demo mode
 from ...core.database import db
 from ...models.schemas import DataPreview, DataSuggestion, BaseResponse
 

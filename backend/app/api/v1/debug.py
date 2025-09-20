@@ -2,15 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Dict, Any
 import uuid
 
-from app.core.auth import get_current_user_id
+# Removed auth import for demo mode
 from app.core.database import db
 
 router = APIRouter()
 
 @router.get("/check-rls/{portfolio_id}", response_model=List[Dict[str, Any]], tags=["Debug"])
 async def debug_check_storage_rls(
-    portfolio_id: str,
-    current_user_id: str = Depends(get_current_user_id)
+    portfolio_id: str
 ):
     """
     Debugs the storage RLS policy by checking portfolio ownership.
@@ -29,7 +28,7 @@ async def debug_check_storage_rls(
         # The Supabase client can call RPC functions directly
         response = await db.client.rpc(
             "debug_storage_rls",
-            {"p_portfolio_id": portfolio_id, "p_user_id": current_user_id}
+            {"p_portfolio_id": portfolio_id, "p_user_id": "demo-user"}
         ).execute()
 
         if response.data:

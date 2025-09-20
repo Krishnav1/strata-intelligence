@@ -122,9 +122,7 @@ async def start_risk_analysis(
 ):
     """Start risk analysis"""
     try:
-        portfolio = await db.get_portfolio(portfolio_id, user_id)
-        if not portfolio:
-            raise HTTPException(status_code=404, detail="Portfolio not found")
+        # Skip portfolio ownership check for demo mode
         
         run_id = await db.create_analysis_run(portfolio_id, "risk")
         
@@ -147,13 +145,10 @@ async def start_sensitivity_analysis(
     portfolio_id: str,
     shocks: Dict[str, float],
     scenario_name: str = None,
-    user_id: str = Depends(get_current_user_id)
 ):
     """Start sensitivity analysis"""
     try:
-        portfolio = await db.get_portfolio(portfolio_id, user_id)
-        if not portfolio:
-            raise HTTPException(status_code=404, detail="Portfolio not found")
+        # Skip portfolio ownership check for demo mode
         
         run_id = await db.create_analysis_run(
             portfolio_id, 
@@ -180,13 +175,10 @@ async def start_optimization(
     portfolio_id: str,
     target_return: float = None,
     risk_aversion: float = None,
-    user_id: str = Depends(get_current_user_id)
 ):
     """Start portfolio optimization"""
     try:
-        portfolio = await db.get_portfolio(portfolio_id, user_id)
-        if not portfolio:
-            raise HTTPException(status_code=404, detail="Portfolio not found")
+        # Skip portfolio ownership check for demo mode
         
         run_id = await db.create_analysis_run(
             portfolio_id, 
@@ -210,13 +202,10 @@ async def start_optimization(
 @router.post("/monte-carlo", response_model=MonteCarloResponse)
 async def run_monte_carlo(
     request: MonteCarloRequest,
-    user_id: str = Depends(get_current_user_id)
 ):
     """Run Monte Carlo simulation"""
     try:
-        portfolio = await db.get_portfolio(request.portfolio_id, user_id)
-        if not portfolio:
-            raise HTTPException(status_code=404, detail="Portfolio not found")
+        # Skip portfolio ownership check for demo mode
         
         # Create analysis run
         run_id = await db.create_analysis_run(
@@ -257,7 +246,6 @@ async def run_monte_carlo(
 @router.get("/runs/{run_id}/status", response_model=AnalysisRunStatus)
 async def get_analysis_status(
     run_id: str,
-    user_id: str = Depends(get_current_user_id)
 ):
     """Get analysis run status"""
     try:
@@ -266,10 +254,7 @@ async def get_analysis_status(
         if not run_info:
             raise HTTPException(status_code=404, detail="Analysis run not found")
         
-        # Verify user owns the portfolio
-        portfolio = await db.get_portfolio(run_info['portfolio_id'], user_id)
-        if not portfolio:
-            raise HTTPException(status_code=403, detail="Access denied")
+        # Skip portfolio ownership check for demo mode
         
         return AnalysisRunStatus(
             run_id=run_id,
@@ -290,7 +275,6 @@ async def get_analysis_status(
 async def get_analysis_results(
     run_id: str,
     result_type: str = None,
-    user_id: str = Depends(get_current_user_id)
 ):
     """Get analysis results"""
     try:
@@ -299,10 +283,7 @@ async def get_analysis_results(
         if not run_info:
             raise HTTPException(status_code=404, detail="Analysis run not found")
         
-        # Verify user owns the portfolio
-        portfolio = await db.get_portfolio(run_info['portfolio_id'], user_id)
-        if not portfolio:
-            raise HTTPException(status_code=403, detail="Access denied")
+        # Skip portfolio ownership check for demo mode
         
         if run_info['status'] != 'succeeded':
             raise HTTPException(status_code=400, detail="Analysis not completed successfully")
