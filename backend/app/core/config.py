@@ -13,7 +13,10 @@ class Settings(BaseSettings):
         "http://localhost:8080",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:8080",
-        "https://strata-intelligence.vercel.app"
+        "https://strata-intelligence.vercel.app",
+        "https://strata-intelligence-git-main-krishnav1s-projects.vercel.app",
+        # Allow all Vercel preview deployments
+        "https://*.vercel.app"
     ]
     
     # Supabase Settings
