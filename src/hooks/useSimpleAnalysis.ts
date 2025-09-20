@@ -20,12 +20,8 @@ interface AnalysisSession {
 export const useSimpleAnalysis = () => {
   const queryClient = useQueryClient();
 
-  // Get current session status
-  const {
-    data: session,
-    isLoading,
-    error,
-  } = useQuery<AnalysisSession>({
+  // Get current session with polling to keep it updated
+  const { data: session, isLoading, error, refetch: refetchSession } = useQuery({
     queryKey: ['simple-analysis-session'],
     queryFn: async () => {
       const response = await fetch(`${API_BASE}/session`);
@@ -34,7 +30,8 @@ export const useSimpleAnalysis = () => {
       }
       return response.json();
     },
-    refetchInterval: 2000, // Poll every 2 seconds for status updates
+    refetchInterval: 2000, // Poll every 2 seconds to keep session updated
+    refetchIntervalInBackground: false,
   });
 
   // Upload file mutation
@@ -63,10 +60,8 @@ export const useSimpleAnalysis = () => {
       return response.json();
     },
     onSuccess: () => {
-      // Use a timeout to prevent immediate re-render issues
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['simple-analysis-session'] });
-      }, 100);
+      // Don't invalidate queries to prevent circular dependency errors
+      // The session will be refetched naturally on next render
     },
   });
 
@@ -84,7 +79,7 @@ export const useSimpleAnalysis = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['simple-analysis-session'] });
+      // Don't invalidate queries to prevent circular dependency errors
     },
   });
 
@@ -165,6 +160,7 @@ export const useSimpleAnalysis = () => {
     uploadFile: uploadFileMutation.mutate,
     isUploading: uploadFileMutation.isPending,
     resetSession: resetSessionMutation.mutate,
+    refetchSession, // Manual refresh function
     
     // Analysis results
     analysisResults: session?.analysis_results || null,

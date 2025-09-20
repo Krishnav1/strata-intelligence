@@ -31,6 +31,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
     getRequiredFileTypes,
     isAllFilesUploaded,
     hasAnalysisResults,
+    refetchSession,
   } = useSimpleAnalysis();
 
   // Call onAllFilesUploaded when analysis is ready
@@ -50,8 +51,12 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
           fileType: selectedFileType as 'assets' | 'factors' | 'benchmarks' | 'sector_holdings',
         });
       });
+      // Manually refresh session after upload (polling will handle the rest)
+      setTimeout(() => {
+        refetchSession();
+      }, 2000);
     },
-    [uploadFile, selectedFileType]
+    [uploadFile, selectedFileType, refetchSession]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
