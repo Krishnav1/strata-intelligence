@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useQuery } from '@tanstack/react-query';
 import { Eye, TrendingUp, TrendingDown, BarChart3, Info, RefreshCw } from 'lucide-react';
 
 interface DataPreviewProps {
@@ -13,79 +14,33 @@ interface DataPreviewProps {
   files: any[];
 }
 
-// Mock data for preview - in real implementation, this would come from Supabase
-const mockPreviewData = {
-  assets: {
-    headers: ['Date', 'NIFTY_50', 'NIFTY_MIDCAP_150', 'GOLD_ETF', 'LIQUID_FUND'],
-    rows: [
-      ['2024-01-01', '21731.40', '47123.80', '5234.20', '4156.78'],
-      ['2024-01-02', '21856.75', '47456.20', '5245.60', '4157.12'],
-      ['2024-01-03', '21723.90', '47234.80', '5221.40', '4157.45'],
-      ['2024-01-04', '21945.60', '47567.40', '5267.80', '4157.89'],
-      ['2024-01-05', '22012.30', '47678.90', '5289.30', '4158.23'],
-    ],
-    stats: {
-      totalRows: 252,
-      dateRange: '2024-01-01 to 2024-12-31',
-      assets: 4,
-      completeness: 98.5
-    }
-  },
-  factors: {
-    headers: ['Date', 'INTEREST_RATE_10Y', 'USD_INR', 'CRUDE_OIL', 'VIX_INDIA'],
-    rows: [
-      ['2024-01-01', '7.25', '82.45', '78.90', '16.45'],
-      ['2024-01-02', '7.28', '82.52', '79.15', '16.23'],
-      ['2024-01-03', '7.22', '82.38', '78.65', '16.78'],
-      ['2024-01-04', '7.31', '82.67', '79.45', '15.89'],
-      ['2024-01-05', '7.29', '82.59', '79.23', '16.12'],
-    ],
-    stats: {
-      totalRows: 252,
-      dateRange: '2024-01-01 to 2024-12-31',
-      factors: 4,
-      completeness: 99.2
-    }
-  },
-  benchmarks: {
-    headers: ['Date', 'NIFTY_50_TR', 'SENSEX_TR', 'MSCI_INDIA'],
-    rows: [
-      ['2024-01-01', '28456.78', '71234.45', '2345.67'],
-      ['2024-01-02', '28623.45', '71456.78', '2356.89'],
-      ['2024-01-03', '28398.90', '71098.76', '2334.56'],
-      ['2024-01-04', '28734.56', '71567.89', '2378.90'],
-      ['2024-01-05', '28789.45', '71634.56', '2389.45'],
-    ],
-    stats: {
-      totalRows: 252,
-      dateRange: '2024-01-01 to 2024-12-31',
-      benchmarks: 3,
-      completeness: 100.0
-    }
-  },
-  sector_holdings: {
-    headers: ['Asset_Name', 'Sector', 'Weight_Percent', 'Market_Value_INR', 'Beta'],
-    rows: [
-      ['ICICI_PRUD_NIFTY_50_ETF', 'Large_Cap_Equity', '35.5', '5325000', '0.98'],
-      ['HDFC_MIDCAP_OPPORTUNITIES', 'Mid_Cap_Equity', '25.2', '3780000', '1.15'],
-      ['SBI_SMALL_CAP_FUND', 'Small_Cap_Equity', '15.8', '2370000', '1.32'],
-      ['HDFC_BANK_ETF', 'Banking', '10.5', '1575000', '1.08'],
-      ['GOLD_BEES_ETF', 'Commodities', '8.0', '1200000', '0.12'],
-    ],
-    stats: {
-      totalRows: 12,
-      totalValue: '₹15,00,00,000',
-      sectors: 5,
-      completeness: 100.0
-    }
-  }
-};
+interface PreviewData {
+  stats: Record<string, string | number>;
+  headers: string[];
+  rows: (string | number)[][];
+}
+
 
 export const DataPreview: React.FC<DataPreviewProps> = ({
   portfolioId,
   files,
 }) => {
   const [activeTab, setActiveTab] = useState('assets');
+
+  const { data: previewData, isLoading: isPreviewLoading } = useQuery<PreviewData | null>({
+    queryKey: ['preview', portfolioId, activeTab],
+    queryFn: async () => {
+      const file = getFileByType(activeTab);
+      if (!file) return null;
+
+      const response = await fetch(`/api/v1/data/preview/${file.id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch preview data');
+      }
+      return response.json();
+    },
+    enabled: !!getFileByType(activeTab),
+  });
 
   const getFileByType = (type: string) => {
     return files.find(file => file.file_type === type && file.status === 'succeeded');
@@ -107,7 +62,11 @@ export const DataPreview: React.FC<DataPreviewProps> = ({
   };
 
   const renderDataTable = (type: string) => {
-    const data = mockPreviewData[type as keyof typeof mockPreviewData];
+    if (isPreviewLoading) {
+      return <div>Loading preview...</div>;
+    }
+
+    const data = previewData;
     if (!data) return null;
 
     return (
@@ -117,7 +76,7 @@ export const DataPreview: React.FC<DataPreviewProps> = ({
           {Object.entries(data.stats).map(([key, value]) => (
             <Card key={key}>
               <CardContent className="p-4">
-                <div className="text-2xl font-bold">{value}</div>
+                <div className="text-2xl font-bold">{String(value)}</div>
                 <div className="text-xs text-muted-foreground capitalize">
                   {key.replace(/([A-Z])/g, ' $1').toLowerCase()}
                 </div>

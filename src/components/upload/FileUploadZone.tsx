@@ -178,25 +178,6 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
         </CardContent>
       </Card>
 
-      {/* Upload Progress */}
-      {Object.keys(uploadProgress).length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Upload Progress</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {Object.entries(uploadProgress).map(([fileName, progress]) => (
-              <div key={fileName} className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="truncate">{fileName}</span>
-                  <span>{Math.round(progress)}%</span>
-                </div>
-                <Progress value={progress} />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Files Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -237,14 +218,6 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
                         </div>
                         <div className="flex items-center space-x-2">
                           {getStatusBadge(file.status)}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteFile(file.id)}
-                            disabled={isDeleting}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
                         </div>
                       </div>
                     ))}
@@ -259,12 +232,12 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
       {/* Data Suggestions */}
       <DataSuggestions 
         portfolioId={portfolioId} 
-        uploadedFileTypes={files.map(f => f.file_type)} 
+        uploadedFileTypes={Object.values(files).map(f => f.file_type)} 
       />
 
       {/* Data Preview */}
-      {files.length > 0 && (
-        <DataPreview portfolioId={portfolioId} files={files} />
+      {Object.keys(files).length > 0 && (
+        <DataPreview portfolioId={portfolioId} files={Object.values(files)} />
       )}
 
       {/* Status Alert */}

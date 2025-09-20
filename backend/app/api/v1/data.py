@@ -12,14 +12,10 @@ router = APIRouter()
 async def get_data_preview(
     portfolio_id: str,
     file_type: Optional[str] = None,
-    user_id: str = Depends(get_current_user_id)
 ):
     """Get data preview for uploaded files"""
     try:
-        # Verify portfolio ownership
-        portfolio = await db.get_portfolio(portfolio_id, user_id)
-        if not portfolio:
-            raise HTTPException(status_code=404, detail="Portfolio not found")
+        # In auth-free mode, we don't check portfolio ownership
         
         files = await db.get_portfolio_files(portfolio_id)
         
@@ -119,14 +115,10 @@ async def get_data_preview(
 @router.get("/{portfolio_id}/suggestions")
 async def get_data_suggestions(
     portfolio_id: str,
-    user_id: str = Depends(get_current_user_id)
 ):
     """Get smart data suggestions for portfolio"""
     try:
-        # Verify portfolio ownership
-        portfolio = await db.get_portfolio(portfolio_id, user_id)
-        if not portfolio:
-            raise HTTPException(status_code=404, detail="Portfolio not found")
+        # In auth-free mode, we don't check portfolio ownership
         
         # Get existing suggestions
         response = db.client.table("data_suggestions").select("*").eq("portfolio_id", portfolio_id).eq("status", "pending").execute()
@@ -203,14 +195,10 @@ async def get_data_suggestions(
 async def accept_data_suggestion(
     portfolio_id: str,
     suggestion_id: str,
-    user_id: str = Depends(get_current_user_id)
 ):
     """Accept a data suggestion"""
     try:
-        # Verify portfolio ownership
-        portfolio = await db.get_portfolio(portfolio_id, user_id)
-        if not portfolio:
-            raise HTTPException(status_code=404, detail="Portfolio not found")
+        # In auth-free mode, we don't check portfolio ownership
         
         # For mock suggestions, just return success
         if suggestion_id.startswith('mock-'):
@@ -236,14 +224,10 @@ async def accept_data_suggestion(
 async def dismiss_data_suggestion(
     portfolio_id: str,
     suggestion_id: str,
-    user_id: str = Depends(get_current_user_id)
 ):
     """Dismiss a data suggestion"""
     try:
-        # Verify portfolio ownership
-        portfolio = await db.get_portfolio(portfolio_id, user_id)
-        if not portfolio:
-            raise HTTPException(status_code=404, detail="Portfolio not found")
+        # In auth-free mode, we don't check portfolio ownership
         
         # For mock suggestions, just return success
         if suggestion_id.startswith('mock-'):
@@ -265,14 +249,10 @@ async def dismiss_data_suggestion(
 @router.get("/{portfolio_id}/statistics")
 async def get_portfolio_statistics(
     portfolio_id: str,
-    user_id: str = Depends(get_current_user_id)
 ):
     """Get portfolio data statistics"""
     try:
-        # Verify portfolio ownership
-        portfolio = await db.get_portfolio(portfolio_id, user_id)
-        if not portfolio:
-            raise HTTPException(status_code=404, detail="Portfolio not found")
+        # In auth-free mode, we don't check portfolio ownership
         
         stats = {
             'data_completeness': 0,
@@ -332,3 +312,57 @@ async def get_portfolio_statistics(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get portfolio statistics: {str(e)}"
         )
+
+@router.get("/preview/{file_id}")
+async def get_file_preview(file_id: str):
+    """Get a preview for a specific file."""
+    try:
+        # Get file info
+        file_response = db.client.table("files").select("*").eq("id", file_id).single().execute()
+        if not file_response.data:
+            raise HTTPException(status_code=404, detail="File not found")
+
+        file_info = file_response.data
+        file_type = file_info.get("file_type")
+        portfolio_id = file_info.get("portfolio_id")
+
+        if not file_type or not portfolio_id:
+            raise HTTPException(status_code=400, detail="File metadata is incomplete")
+
+        # Fetch the corresponding data
+        if file_type == 'assets':
+            df = await db.get_asset_data(portfolio_id)
+        elif file_type == 'factors':
+            df = await db.get_factor_data(portfolio_id)
+        elif file_type == 'benchmarks':
+            df = await db.get_benchmark_data(portfolio_id)
+        elif file_type == 'sector_holdings':
+            # For holdings, we fetch directly
+            response = db.client.table("holding_data").select("*").eq("portfolio_id", portfolio_id).limit(5).execute()
+            if response.data:
+                headers = ['asset_name', 'sector', 'weight_percent', 'market_value_inr', 'beta']
+                rows = [[str(h.get(col, '')) for col in headers] for h in response.data]
+                return {"stats": {"total_rows": len(rows)}, "headers": headers, "rows": rows}
+            else:
+                return {"stats": {}, "headers": [], "rows": []}
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown file type: {file_type}")
+
+        if df.empty:
+            return {"stats": {}, "headers": [], "rows": []}
+
+        # Format for preview
+        headers = list(df.columns)
+        rows = df.head(5).values.tolist()
+        stats = {
+            "total_rows": len(df),
+            "date_range": f"{df['date'].min().strftime('%Y-%m-%d')} to {df['date'].max().strftime('%Y-%m-%d')}",
+            "columns": len(headers)
+        }
+
+        return {"stats": stats, "headers": headers, "rows": rows}
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
