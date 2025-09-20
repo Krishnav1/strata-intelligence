@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from . import portfolios, files, analysis, data
+from . import portfolios, files, analysis, data, debug
 
 api_router = APIRouter()
 
@@ -9,3 +9,4 @@ api_router.include_router(portfolios.router, prefix="/portfolios", tags=["portfo
 api_router.include_router(files.router, prefix="/files", tags=["files"])
 api_router.include_router(analysis.router, prefix="/analysis", tags=["analysis"])
 api_router.include_router(data.router, prefix="/data", tags=["data"])
+api_router.include_router(debug.router, prefix="/debug", tags=["Debug"])
