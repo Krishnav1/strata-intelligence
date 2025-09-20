@@ -27,6 +27,10 @@ export const DataPreview: React.FC<DataPreviewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState('assets');
 
+  const getFileByType = (type: string) => {
+    return files.find(file => file.file_type === type && file.status === 'completed');
+  };
+
   const { data: previewData, isLoading: isPreviewLoading } = useQuery<PreviewData | null>({
     queryKey: ['preview', portfolioId, activeTab],
     queryFn: async () => {
@@ -41,10 +45,6 @@ export const DataPreview: React.FC<DataPreviewProps> = ({
     },
     enabled: !!getFileByType(activeTab),
   });
-
-  const getFileByType = (type: string) => {
-    return files.find(file => file.file_type === type && file.status === 'succeeded');
-  };
 
   const getTabIcon = (type: string) => {
     switch (type) {
@@ -159,7 +159,7 @@ export const DataPreview: React.FC<DataPreviewProps> = ({
             {['assets', 'factors', 'benchmarks', 'sector_holdings'].map((type) => {
               const file = getFileByType(type);
               const isAvailable = !!file;
-              const Icon = getTabIcon(type);
+              const iconElement = getTabIcon(type);
               
               return (
                 <TabsTrigger
@@ -168,7 +168,7 @@ export const DataPreview: React.FC<DataPreviewProps> = ({
                   disabled={!isAvailable}
                   className="flex items-center space-x-2"
                 >
-                  <Icon />
+                  {iconElement}
                   <span className="hidden sm:inline capitalize">
                     {type.replace('_', ' ')}
                   </span>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const API_BASE = 'https://strata-intelligence.onrender.com/api/v1/simple';
 
@@ -8,6 +8,8 @@ interface FileStatus {
   original_filename: string;
   status: 'queued' | 'processing' | 'completed' | 'failed';
   error?: string;
+  file_size?: number;
+  created_at: string;
 }
 
 interface AnalysisSession {
@@ -16,41 +18,48 @@ interface AnalysisSession {
   analysis_results: any;
 }
 
-export const useSimpleAnalysis = () => {
-  const [session, setSession] = useState<AnalysisSession | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+// Stable query keys
+const QUERY_KEYS = {
+  session: ['simple-analysis', 'session'] as const,
+  analysis: ['simple-analysis', 'analysis'] as const,
+} as const;
 
-  const fetchSession = useCallback(async () => {
-    try {
+export const useSimpleAnalysis = () => {
+  const queryClient = useQueryClient();
+
+  // Session query with polling
+  const {
+    data: session,
+    isLoading,
+    error,
+    refetch: refetchSession,
+  } = useQuery<AnalysisSession>({
+    queryKey: QUERY_KEYS.session,
+    queryFn: async () => {
       const response = await fetch(`${API_BASE}/session`);
       if (!response.ok) {
         throw new Error('Failed to fetch session');
       }
-      const data = await response.json();
-      setSession(data);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+      return response.json();
+    },
+    refetchInterval: 3000, // Poll every 3 seconds
+    refetchIntervalInBackground: true,
+    staleTime: 1000, // Consider data stale after 1 second
+  });
 
-  useEffect(() => {
-    fetchSession();
-    const interval = setInterval(fetchSession, 3000);
-    return () => clearInterval(interval);
-  }, [fetchSession]);
+  // Upload mutation
+  const uploadFileMutation = useMutation({
+    mutationFn: async ({ 
+      file, 
+      fileType 
+    }: { 
+      file: File; 
+      fileType: 'assets' | 'factors' | 'benchmarks' | 'sector_holdings';
+    }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('file_type', fileType);
 
-  const uploadFile = useCallback(async ({ file, fileType }: { file: File; fileType: string }) => {
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('file_type', fileType);
-
-    try {
       const response = await fetch(`${API_BASE}/upload`, {
         method: 'POST',
         body: formData,
@@ -61,32 +70,45 @@ export const useSimpleAnalysis = () => {
         throw new Error(errorText || 'Upload failed');
       }
 
-      await response.json();
-      await fetchSession(); // Refresh session data
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
-      throw err; // Re-throw to be caught in the component
-    } finally {
-      setIsUploading(false);
-    }
-  }, [fetchSession]);
+      return response.json();
+    },
+    onSuccess: () => {
+      // Use setQueryData for immediate update instead of invalidation to prevent loops
+      queryClient.invalidateQueries({ 
+        queryKey: QUERY_KEYS.session,
+        exact: true 
+      });
+    },
+  });
 
-  const resetSession = useCallback(async () => {
-    try {
+  // Reset session mutation
+  const resetSessionMutation = useMutation({
+    mutationFn: async () => {
       const response = await fetch(`${API_BASE}/reset`, {
         method: 'POST',
       });
+
       if (!response.ok) {
         throw new Error('Failed to reset session');
       }
-      await response.json();
-      await fetchSession(); // Refresh session data
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Reset failed');
-    }
-  }, [fetchSession]);
 
-  const fetchAnalysisResults = useCallback(async () => {
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidate both session and analysis queries with exact matching
+      queryClient.invalidateQueries({ 
+        queryKey: QUERY_KEYS.session,
+        exact: true 
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: QUERY_KEYS.analysis,
+        exact: true 
+      });
+    },
+  });
+
+  // Analysis results query (manual fetch)
+  const fetchAnalysisResults = async () => {
     try {
       const response = await fetch(`${API_BASE}/analysis`);
       if (!response.ok) {
@@ -98,36 +120,51 @@ export const useSimpleAnalysis = () => {
       console.error('Analysis fetch error:', error);
       return null;
     }
-  }, []);
+  };
 
-  const getFilesByType = useCallback((fileType: string) => {
+  // Helper functions
+  const getFilesByType = (fileType: string) => {
     if (!session?.files) return [];
-    return Object.values(session.files).filter(f => f.file_type === fileType);
-  }, [session]);
+    const file = session.files[fileType];
+    return file ? [file] : [];
+  };
 
-  const getRequiredFileTypes = useCallback(() => [
+  const getRequiredFileTypes = () => [
     { type: 'assets', label: 'Assets Data', description: 'Historical asset prices and returns' },
     { type: 'factors', label: 'Risk Factors', description: 'Market risk factors (equity, rates, etc.)' },
     { type: 'benchmarks', label: 'Benchmarks', description: 'Benchmark indices for comparison' },
     { type: 'sector_holdings', label: 'Sector Holdings', description: 'Portfolio sector allocation data' },
-  ], []);
+  ] as const;
 
-  const isAllFilesUploaded = !!session?.files?.assets && session.files.assets.status === 'completed';
-  const hasAnalysisResults = !!session?.analysis_results && session.analysis_results.status === 'completed';
+  // Computed values
+  const isAllFilesUploaded = Boolean(
+    session?.files?.assets?.status === 'completed'
+  );
+
+  const hasAnalysisResults = Boolean(
+    session?.analysis_results?.status === 'completed'
+  );
 
   return {
+    // Session data
     session,
     files: session?.files || {},
     isLoading,
-    error,
-    uploadFile,
-    isUploading,
-    resetSession,
-    refetchSession: fetchSession,
+    error: error as Error | null,
+    
+    // File operations
+    uploadFile: uploadFileMutation.mutate,
+    isUploading: uploadFileMutation.isPending,
+    resetSession: resetSessionMutation.mutate,
+    refetchSession,
+    
+    // Analysis results
     analysisResults: session?.analysis_results || null,
-    isAnalysisLoading: isLoading, // Reflect general loading state
+    isAnalysisLoading: false, // No automatic loading for analysis
     hasAnalysisResults,
     fetchAnalysisResults,
+    
+    // Helper functions
     getFilesByType,
     getRequiredFileTypes,
     isAllFilesUploaded,

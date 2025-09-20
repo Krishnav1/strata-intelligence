@@ -73,12 +73,14 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'succeeded':
+      case 'completed':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'failed':
         return <AlertCircle className="h-4 w-4 text-red-500" />;
-      case 'running':
+      case 'processing':
         return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
+      case 'queued':
+        return <File className="h-4 w-4 text-muted-foreground" />;
       default:
         return <File className="h-4 w-4 text-muted-foreground" />;
     }
@@ -86,9 +88,9 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
 
   const getStatusBadge = (status: string) => {
     const variants = {
-      succeeded: 'default',
+      completed: 'default',
       failed: 'destructive',
-      running: 'secondary',
+      processing: 'secondary',
       queued: 'outline',
     } as const;
 
@@ -188,7 +190,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {requiredFileTypes.map(({ type, label, description }) => {
           const typeFiles = getFilesByType(type);
-          const hasSuccessfulFile = typeFiles.some(f => f.status === 'succeeded');
+          const hasSuccessfulFile = typeFiles.some(f => f.status === 'completed');
 
           return (
             <Card key={type} className={hasSuccessfulFile ? 'border-green-200' : ''}>
@@ -217,7 +219,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(file.created_at), 'MMM d, HH:mm')}
-                              {file.file_size && ` • ${Math.round(file.file_size / 1024)} KB`}
+                              {file.file_size && typeof file.file_size === 'number' && ` • ${Math.round(file.file_size / 1024)} KB`}
                             </p>
                           </div>
                         </div>
