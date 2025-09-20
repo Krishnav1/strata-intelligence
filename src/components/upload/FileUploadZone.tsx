@@ -95,7 +95,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   };
 
   React.useEffect(() => {
-    if (isAllFilesUploaded() && onAllFilesUploaded) {
+    if (isAllFilesUploaded && onAllFilesUploaded) {
       onAllFilesUploaded();
     }
   }, [isAllFilesUploaded, onAllFilesUploaded]);
@@ -241,7 +241,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
       )}
 
       {/* Status Alert */}
-      {isAllFilesUploaded() && (
+      {isAllFilesUploaded && (
         <Alert>
           <CheckCircle className="h-4 w-4" />
           <AlertDescription>

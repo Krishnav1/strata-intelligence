@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 const API_BASE = 'https://strata-intelligence.onrender.com/api/v1/simple';
 
@@ -120,17 +121,17 @@ export const useSimpleAnalysis = () => {
     ] as const;
   };
 
-  const isAllFilesUploaded = () => {
+  const isAllFilesUploaded = useMemo(() => {
     if (!session?.files) return false;
     
     // Check if we have at least assets data (minimum requirement)
     const assetsFile = session.files['assets'];
     return assetsFile && assetsFile.status === 'completed';
-  };
+  }, [session?.files]);
 
-  const hasAnalysisResults = () => {
+  const hasAnalysisResults = useMemo(() => {
     return !!session?.analysis_results && session.analysis_results.status === 'completed';
-  };
+  }, [session?.analysis_results]);
 
   return {
     // Session data
@@ -147,7 +148,7 @@ export const useSimpleAnalysis = () => {
     // Analysis results
     analysisResults,
     isAnalysisLoading,
-    hasAnalysisResults: hasAnalysisResults(),
+    hasAnalysisResults,
     
     // Helper functions
     getFilesByType,
