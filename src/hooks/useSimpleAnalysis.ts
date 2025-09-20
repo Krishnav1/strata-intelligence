@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const API_BASE = 'https://strata-intelligence.onrender.com/api/v1/simple';
 
@@ -22,8 +22,7 @@ export const useSimpleAnalysis = () => {
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Manual session fetching function
-  const fetchSession = async () => {
+  const fetchSession = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/session`);
       if (!response.ok) {
@@ -37,141 +36,98 @@ export const useSimpleAnalysis = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Initial fetch and polling
-  useEffect(() => {
-    fetchSession();
-    const interval = setInterval(fetchSession, 3000); // Poll every 3 seconds
-    return () => clearInterval(interval);
   }, []);
 
-  // Upload file function
-  const uploadFile = async ({ 
-    file, 
-    fileType 
-  }: { 
-    file: File; 
-    fileType: 'assets' | 'factors' | 'benchmarks' | 'sector_holdings';
-  }) => {
-    try {
-      setIsUploading(true);
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('file_type', fileType);
+  useEffect(() => {
+    fetchSession();
+    const interval = setInterval(fetchSession, 3000);
+    return () => clearInterval(interval);
+  }, [fetchSession]);
 
+  const uploadFile = useCallback(async ({ file, fileType }: { file: File; fileType: string }) => {
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('file_type', fileType);
+
+    try {
       const response = await fetch(`${API_BASE}/upload`, {
         method: 'POST',
         body: formData,
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || 'Upload failed');
+        const errorText = await response.text();
+        throw new Error(errorText || 'Upload failed');
       }
 
-      const result = await response.json();
-      
-      // Refresh session after successful upload
-      setTimeout(() => {
-        fetchSession();
-      }, 1000);
-      
-      return result;
+      await response.json();
+      await fetchSession(); // Refresh session data
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
-      throw err;
+      throw err; // Re-throw to be caught in the component
     } finally {
       setIsUploading(false);
     }
-  };
+  }, [fetchSession]);
 
-  // Reset session function
-  const resetSession = async () => {
+  const resetSession = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/reset`, {
         method: 'POST',
       });
-
       if (!response.ok) {
         throw new Error('Failed to reset session');
       }
-
-      const result = await response.json();
-      
-      // Refresh session after reset
-      setTimeout(() => {
-        fetchSession();
-      }, 500);
-      
-      return result;
+      await response.json();
+      await fetchSession(); // Refresh session data
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Reset failed');
-      throw err;
     }
-  };
+  }, [fetchSession]);
 
-  // Manual function to fetch analysis results
-  const fetchAnalysisResults = async () => {
+  const fetchAnalysisResults = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/analysis`);
       if (!response.ok) {
-        if (response.status === 404) {
-          return null; // No results yet
-        }
+        if (response.status === 404) return null;
         throw new Error('Failed to fetch analysis results');
       }
       return await response.json();
     } catch (error) {
-      console.log('Analysis fetch error:', error);
+      console.error('Analysis fetch error:', error);
       return null;
     }
-  };
+  }, []);
 
-  const getFilesByType = (fileType: string) => {
+  const getFilesByType = useCallback((fileType: string) => {
     if (!session?.files) return [];
-    const file = session.files[fileType];
-    return file ? [file] : [];
-  };
+    return Object.values(session.files).filter(f => f.file_type === fileType);
+  }, [session]);
 
-  const getRequiredFileTypes = () => {
-    return [
-      { type: 'assets', label: 'Assets Data', description: 'Historical asset prices and returns' },
-      { type: 'factors', label: 'Risk Factors', description: 'Market risk factors (equity, rates, etc.)' },
-      { type: 'benchmarks', label: 'Benchmarks', description: 'Benchmark indices for comparison' },
-      { type: 'sector_holdings', label: 'Sector Holdings', description: 'Portfolio sector allocation data' },
-    ] as const;
-  };
+  const getRequiredFileTypes = useCallback(() => [
+    { type: 'assets', label: 'Assets Data', description: 'Historical asset prices and returns' },
+    { type: 'factors', label: 'Risk Factors', description: 'Market risk factors (equity, rates, etc.)' },
+    { type: 'benchmarks', label: 'Benchmarks', description: 'Benchmark indices for comparison' },
+    { type: 'sector_holdings', label: 'Sector Holdings', description: 'Portfolio sector allocation data' },
+  ], []);
 
-  // Simplified boolean values to avoid circular dependencies
-  const isAllFilesUploaded = Boolean(
-    session?.files?.assets?.status === 'completed'
-  );
-
-  const hasAnalysisResults = Boolean(
-    session?.analysis_results?.status === 'completed'
-  );
+  const isAllFilesUploaded = !!session?.files?.assets && session.files.assets.status === 'completed';
+  const hasAnalysisResults = !!session?.analysis_results && session.analysis_results.status === 'completed';
 
   return {
-    // Session data
     session,
     files: session?.files || {},
     isLoading,
     error,
-    
-    // File operations
     uploadFile,
     isUploading,
     resetSession,
-    refetchSession: fetchSession, // Manual refresh function
-    
-    // Analysis results
+    refetchSession: fetchSession,
     analysisResults: session?.analysis_results || null,
-    isAnalysisLoading: false, // Simplified - no automatic loading
+    isAnalysisLoading: isLoading, // Reflect general loading state
     hasAnalysisResults,
     fetchAnalysisResults,
-    
-    // Helper functions
     getFilesByType,
     getRequiredFileTypes,
     isAllFilesUploaded,
