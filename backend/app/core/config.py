@@ -23,7 +23,8 @@ class Settings(BaseSettings):
     SUPABASE_JWT_SECRET: str = os.getenv("SUPABASE_JWT_SECRET", "")
     
     # Database Settings
-    DATABASE_URL: str = f"postgresql://postgres:[password]@db.mdmghgcsvfzsafteuiqi.supabase.co:5432/postgres"
+    # Use env var so we can provide either the Direct URI or Transaction Pooler URI per environment
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     
     # Redis Settings (for Celery)
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")

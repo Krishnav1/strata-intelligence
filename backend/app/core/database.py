@@ -13,10 +13,24 @@ class SupabaseDatabase:
     """
     
     def __init__(self):
-        self.client: Client = create_client(
-            settings.SUPABASE_URL, 
-            settings.SUPABASE_SERVICE_ROLE_KEY
-        )
+        self._client: Optional[Client] = None
+    
+    @property
+    def client(self) -> Client:
+        """Get or create Supabase client with lazy initialization"""
+        if self._client is None:
+            if not settings.SUPABASE_SERVICE_ROLE_KEY:
+                raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY environment variable is not set")
+            
+            try:
+                self._client = create_client(
+                    settings.SUPABASE_URL, 
+                    settings.SUPABASE_SERVICE_ROLE_KEY
+                )
+            except Exception as e:
+                raise RuntimeError(f"Failed to initialize Supabase client: {str(e)}")
+        
+        return self._client
     
     # Portfolio Operations
     async def get_user_portfolios(self, user_id: str) -> List[Dict[str, Any]]:
