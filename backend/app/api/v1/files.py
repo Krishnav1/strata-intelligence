@@ -177,15 +177,11 @@ async def delete_file(file_id: str):
 async def reprocess_file(
     portfolio_id: str,
     file_id: str,
-    background_tasks: BackgroundTasks,
-    user_id: str = Depends(get_current_user_id)
+    background_tasks: BackgroundTasks
 ):
     """Reprocess a failed file"""
     try:
-        # Verify portfolio ownership
-        portfolio = await db.get_portfolio(portfolio_id, user_id)
-        if not portfolio:
-            raise HTTPException(status_code=404, detail="Portfolio not found")
+        # Skip portfolio ownership check for demo mode
         
         # Get file info
         response = db.client.table("files").select("*").eq("id", file_id).single().execute()
