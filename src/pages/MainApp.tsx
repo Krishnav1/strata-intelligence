@@ -1,36 +1,24 @@
 import React, { useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { PortfolioSelector } from '@/components/portfolio/PortfolioSelector';
 import { FileUploadZone } from '@/components/upload/FileUploadZone';
-import { useFileUpload } from '@/hooks/useFileUpload';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Stepper } from '@/components/ui/stepper';
 import { ArrowRight, CheckCircle, Upload, BarChart3 } from 'lucide-react';
 import Dashboard from './Dashboard';
 
-type AppStep = 'portfolio' | 'upload' | 'dashboard';
+type AppStep = 'upload' | 'dashboard';
 
 const MainApp: React.FC = () => {
-  const [currentStep, setCurrentStep] = useState<AppStep>('portfolio');
-  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(null);
-  
-  const { isAllFilesUploaded } = useFileUpload(selectedPortfolioId);
+  const [currentStep, setCurrentStep] = useState<AppStep>('upload');
+  const [filesUploaded, setFilesUploaded] = useState(false);
 
   const steps = [
-    {
-      id: 'portfolio',
-      title: 'Select Portfolio',
-      description: 'Choose or create a portfolio to analyze',
-      icon: BarChart3,
-      completed: !!selectedPortfolioId,
-    },
     {
       id: 'upload',
       title: 'Upload Data',
       description: 'Upload your portfolio data files',
       icon: Upload,
-      completed: isAllFilesUploaded(),
+      completed: filesUploaded,
     },
     {
       id: 'dashboard',
@@ -41,12 +29,8 @@ const MainApp: React.FC = () => {
     },
   ];
 
-  const handlePortfolioSelect = (portfolioId: string) => {
-    setSelectedPortfolioId(portfolioId);
-    setCurrentStep('upload');
-  };
-
   const handleFilesUploaded = () => {
+    setFilesUploaded(true);
     setCurrentStep('dashboard');
   };
 
@@ -55,48 +39,29 @@ const MainApp: React.FC = () => {
   };
 
   const canProceedToNext = () => {
-    switch (currentStep) {
-      case 'portfolio':
-        return !!selectedPortfolioId;
-      case 'upload':
-        return isAllFilesUploaded();
-      default:
-        return false;
-    }
+    return currentStep === 'upload' && filesUploaded;
   };
 
   const handleNext = () => {
-    if (currentStep === 'portfolio' && selectedPortfolioId) {
-      setCurrentStep('upload');
-    } else if (currentStep === 'upload' && isAllFilesUploaded()) {
+    if (currentStep === 'upload' && filesUploaded) {
       setCurrentStep('dashboard');
     }
   };
 
   const handleBack = () => {
-    if (currentStep === 'upload') {
-      setCurrentStep('portfolio');
-    } else if (currentStep === 'dashboard') {
+    if (currentStep === 'dashboard') {
       setCurrentStep('upload');
     }
   };
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case 'portfolio':
-        return (
-          <PortfolioSelector
-            selectedPortfolioId={selectedPortfolioId}
-            onPortfolioSelect={handlePortfolioSelect}
-          />
-        );
       case 'upload':
-        return selectedPortfolioId ? (
+        return (
           <FileUploadZone
-            portfolioId={selectedPortfolioId}
             onAllFilesUploaded={handleFilesUploaded}
           />
-        ) : null;
+        );
       case 'dashboard':
         return <Dashboard />;
       default:
@@ -114,9 +79,9 @@ const MainApp: React.FC = () => {
         {/* Progress Stepper */}
         <Card>
           <CardHeader>
-            <CardTitle>Setup Your Portfolio Analysis</CardTitle>
+            <CardTitle>Portfolio Analysis</CardTitle>
             <CardDescription>
-              Follow these steps to get started with your portfolio intelligence dashboard
+              Upload your data files and view comprehensive analysis
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -167,7 +132,7 @@ const MainApp: React.FC = () => {
               <Button
                 variant="outline"
                 onClick={handleBack}
-                disabled={currentStep === 'portfolio'}
+                disabled={currentStep === 'upload'}
               >
                 Back
               </Button>

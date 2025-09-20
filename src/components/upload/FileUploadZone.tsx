@@ -14,12 +14,12 @@ import { Upload, File, CheckCircle, AlertCircle, Trash2, Loader2, Download, Info
 import { format } from 'date-fns';
 
 interface FileUploadZoneProps {
-  portfolioId: string;
+  portfolioId?: string;
   onAllFilesUploaded?: () => void;
 }
 
 export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
-  portfolioId,
+  portfolioId = 'simple-analysis', // Default session ID for simple analysis
   onAllFilesUploaded,
 }) => {
   const {
