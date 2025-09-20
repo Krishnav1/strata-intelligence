@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
 
 const API_BASE = 'https://strata-intelligence.onrender.com/api/v1/simple';
 
@@ -64,7 +63,10 @@ export const useSimpleAnalysis = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['simple-analysis-session'] });
+      // Use a timeout to prevent immediate re-render issues
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['simple-analysis-session'] });
+      }, 100);
     },
   });
 
@@ -86,24 +88,31 @@ export const useSimpleAnalysis = () => {
     },
   });
 
-  // Get analysis results
+  // Get analysis results - simplified to avoid circular dependencies
   const {
     data: analysisResults,
     isLoading: isAnalysisLoading,
   } = useQuery({
     queryKey: ['analysis-results'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/analysis`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null; // No results yet
+      try {
+        const response = await fetch(`${API_BASE}/analysis`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            return null; // No results yet
+          }
+          throw new Error('Failed to fetch analysis results');
         }
-        throw new Error('Failed to fetch analysis results');
+        return response.json();
+      } catch (error) {
+        console.log('Analysis fetch error:', error);
+        return null;
       }
-      return response.json();
     },
-    enabled: !!session?.analysis_results && session.analysis_results.status === 'completed',
-    retry: false, // Don't retry on 404
+    enabled: false, // Disable automatic fetching to prevent loops
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const getFilesByType = (fileType: string) => {
@@ -121,17 +130,29 @@ export const useSimpleAnalysis = () => {
     ] as const;
   };
 
-  const isAllFilesUploaded = useMemo(() => {
-    if (!session?.files) return false;
-    
-    // Check if we have at least assets data (minimum requirement)
-    const assetsFile = session.files['assets'];
-    return assetsFile && assetsFile.status === 'completed';
-  }, [session?.files]);
+  // Simplified boolean values to avoid circular dependencies
+  const isAllFilesUploaded = Boolean(
+    session?.files?.assets?.status === 'completed'
+  );
 
-  const hasAnalysisResults = useMemo(() => {
-    return !!session?.analysis_results && session.analysis_results.status === 'completed';
-  }, [session?.analysis_results]);
+  const hasAnalysisResults = Boolean(
+    session?.analysis_results?.status === 'completed'
+  );
+
+  // Manual function to fetch analysis results
+  const fetchAnalysisResults = async () => {
+    if (hasAnalysisResults) {
+      try {
+        const response = await fetch(`${API_BASE}/analysis`);
+        if (response.ok) {
+          return await response.json();
+        }
+      } catch (error) {
+        console.log('Error fetching analysis:', error);
+      }
+    }
+    return null;
+  };
 
   return {
     // Session data
@@ -146,9 +167,10 @@ export const useSimpleAnalysis = () => {
     resetSession: resetSessionMutation.mutate,
     
     // Analysis results
-    analysisResults,
-    isAnalysisLoading,
+    analysisResults: session?.analysis_results || null,
+    isAnalysisLoading: false, // Simplified - no automatic loading
     hasAnalysisResults,
+    fetchAnalysisResults,
     
     // Helper functions
     getFilesByType,
