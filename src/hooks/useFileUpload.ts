@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from './useAuth';
 import type { Database } from '@/lib/supabase';
 
 type FileRecord = Database['public']['Tables']['files']['Row'];
 type FileInsert = Database['public']['Tables']['files']['Insert'];
 
 export const useFileUpload = (portfolioId: string | null) => {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
 
@@ -41,7 +39,7 @@ export const useFileUpload = (portfolioId: string | null) => {
       file: File; 
       fileType: 'assets' | 'factors' | 'benchmarks' | 'sector_holdings';
     }) => {
-      if (!portfolioId || !user) throw new Error('Portfolio or user not available');
+      if (!portfolioId) throw new Error('Portfolio not available');
 
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
@@ -50,12 +48,7 @@ export const useFileUpload = (portfolioId: string | null) => {
       // Upload file to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('portfolio-files')
-        .upload(filePath, file, {
-          onUploadProgress: (progress) => {
-            const percent = (progress.loaded / progress.total) * 100;
-            setUploadProgress(prev => ({ ...prev, [file.name]: percent }));
-          },
-        });
+        .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 

@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from './useAuth';
 import type { Database } from '@/lib/supabase';
 
 type Portfolio = Database['public']['Tables']['portfolios']['Row'];
 type PortfolioInsert = Database['public']['Tables']['portfolios']['Insert'];
 
 export const usePortfolios = () => {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const {
@@ -16,31 +14,25 @@ export const usePortfolios = () => {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['portfolios', user?.id],
+    queryKey: ['portfolios'],
     queryFn: async () => {
-      if (!user) return [];
-      
       const { data, error } = await supabase
         .from('portfolios')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data as Portfolio[];
     },
-    enabled: !!user,
   });
 
   const createPortfolioMutation = useMutation({
     mutationFn: async (portfolio: Omit<PortfolioInsert, 'user_id'>) => {
-      if (!user) throw new Error('User not authenticated');
-
       const { data, error } = await supabase
         .from('portfolios')
         .insert({
           ...portfolio,
-          user_id: user.id,
+          user_id: 'demo-user', // Use a dummy user ID for demo
         })
         .select()
         .single();
@@ -49,7 +41,7 @@ export const usePortfolios = () => {
       return data as Portfolio;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['portfolios', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['portfolios'] });
     },
   });
 
@@ -69,7 +61,7 @@ export const usePortfolios = () => {
       return data as Portfolio;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['portfolios', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['portfolios'] });
     },
   });
 
@@ -83,7 +75,7 @@ export const usePortfolios = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['portfolios', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['portfolios'] });
     },
   });
 
@@ -101,23 +93,20 @@ export const usePortfolios = () => {
 };
 
 export const usePortfolio = (portfolioId: string | null) => {
-  const { user } = useAuth();
-
   return useQuery({
     queryKey: ['portfolio', portfolioId],
     queryFn: async () => {
-      if (!portfolioId || !user) return null;
+      if (!portfolioId) return null;
 
       const { data, error } = await supabase
         .from('portfolios')
         .select('*')
         .eq('id', portfolioId)
-        .eq('user_id', user.id)
         .single();
 
       if (error) throw error;
       return data as Portfolio;
     },
-    enabled: !!portfolioId && !!user,
+    enabled: !!portfolioId,
   });
 };
